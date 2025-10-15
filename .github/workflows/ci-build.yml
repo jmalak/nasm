@@ -1,0 +1,114 @@
+name: CI-Build
+run-name: CI build
+
+on:
+  pull_request:
+    branches: '*'
+    paths:
+      - '**'
+      - '!.github/**'
+      - '!README.md'
+  push:
+    branches:
+      - master
+    paths:
+      - '**'
+      - '!.github/**'
+      - '!README.md'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+
+jobs:
+  OpenWatcom-1:
+    strategy:
+      matrix:
+        targ:
+          - id: 'dos'
+            title: 'DOS'
+          - id: 'os2'
+            title: 'OS/2'
+          - id: 'win32'
+            title: 'WIN32'
+          - id: 'linux386'
+            title: 'Linux'
+        host:
+          - id: 'Linux'
+            image: 'ubuntu-latest'
+          - id: 'Windows'
+            image: 'windows-latest'
+        comp: 
+          - id: '1.9'
+          - id: '2.0'
+    runs-on: ${{matrix.host.image}}
+    name: ${{matrix.targ.title}} - Open Watcom ${{matrix.comp.id}} (${{matrix.host.id}} host)
+
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4
+    - name: Open Watcom setup
+      uses: open-watcom/setup-watcom@v0
+      with:
+        version: ${{matrix.comp.id}}
+    - name: build
+      run: |
+        wmake -d -sn -f Mkfiles/openwcom.mak ${{matrix.targ.id}}
+  Linux-1:
+    strategy:
+      matrix:
+        targ:
+          - id: 'Linux'
+        host:
+          - id: 'Ubuntu'
+            image: 'ubuntu-latest'
+        comp: 
+          - id: 'GCC'
+    runs-on: ${{matrix.host.image}}
+    name: ${{matrix.targ.id}} - ${{matrix.comp.id}} (${{matrix.host.id}} host)
+
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4
+    - name: install perl module
+      run: sudo cpan -i Font::TTF::Font Sort::Versions
+      shell: bash
+    - name: autogen
+      run: |
+        ./autogen.sh
+      shell: bash
+    - name: configure
+      run: |
+        ./configure
+      shell: bash
+    - name: build
+      run: |
+        make all
+      shell: bash
+  Windows-1:
+    strategy:
+      matrix:
+        targ:
+          - id: 'WIN64'
+        host:
+          - id: 'Windows 2025'
+            image: 'windows-latest'
+        comp: 
+          - id: '2022'
+    runs-on: ${{matrix.host.image}}
+    name: ${{matrix.targ.id}} - Visual Studio ${{matrix.comp.id}} (${{matrix.host.id}} host)
+
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4
+    - name: Enable Developer Command Prompt
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        vsversion: ${{matrix.comp.id}}
+        arch: amd64
+    - name: build
+      run: |
+        nmake /f Mkfiles\msvc.mak all
+      shell: cmd
